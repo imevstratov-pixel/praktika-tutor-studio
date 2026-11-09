@@ -93,15 +93,17 @@ for(let index=1;index<=(mode==='accept'?policy.consecutivePasses:1);index++) {
   let artifactWatcher;
   try {
     if(run.sourceStart!==first.hash)throw Error('Состав исходников/тестов изменился. Начните приёмку заново.');
-    if(mode!=='smoke') {
-      await command(run,'typecheck',['node_modules/typescript/bin/tsc','--noEmit'],90000);
-      const tap=await command(run,'unit-and-server',['scripts/test-unit.mjs','--tap'],120000);
-      run.unit=summarizeTap(tap);
-    }
+    if(mode!=='smoke')await command(run,'typecheck',['node_modules/typescript/bin/tsc','--noEmit'],90000);
+    // Server tests serve dist/index.html. Build this revision before they run,
+    // including on a fresh checkout where no previous dist directory exists.
     await command(run,'production-build',['scripts/build.mjs'],90000);
     run.artifact=await artifactFingerprint();
     artifactWatcher=watch(path.resolve(root,'../dist/index.html'),()=>{run.artifactChanged=true;});
     artifactWatcher.on('error',()=>{run.artifactChanged=true;});
+    if(mode!=='smoke') {
+      const tap=await command(run,'unit-and-server',['scripts/test-unit.mjs','--tap'],120000);
+      run.unit=summarizeTap(tap);
+    }
     const args=['node_modules/@playwright/test/cli.js','test','--config=playwright.config.mjs'];
     if(mode==='smoke')args.push('--grep','@smoke');
     await command(run,'browser',args,240000,{QA_RUN_DIR:directory});

@@ -23,7 +23,7 @@
   npm run build:local
 Сборка создаёт dist-v2/index.html и обновляет dist/index.html для локального сервера.
   npm run check
-Полный набор данных и сервера: npm test (из ui/).
+После сборки полный набор данных и сервера: npm test (из ui/). Для полной приёмки из чистого репозитория используйте npm run accept — он сам создаёт сборку до проверки сервера.
 Смоук: npm run smoke. Полная приёмка: npm run accept. Первый раз установите тестовый браузер: npm run browser:install.
 Правило приёмки, область покрытия и дальнейшая оценка модели: QUALITY.txt.
 Проверка сервера: node --test local/server.test.mjs (из «Практика»).

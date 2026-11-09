@@ -6,7 +6,7 @@ const sha=data=>createHash('sha256').update(data).digest('hex');
 const digest=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
 const list=value=>Array.isArray(value)?value:[];
 const integer=value=>Number.isInteger(value)&&value>=0;
-export const requiredSteps=['typecheck','unit-and-server','production-build','browser'];
+export const requiredSteps=['typecheck','production-build','unit-and-server','browser'];
 export const inputFile=name=>/\.(?:json|html)$/.test(name)||/\.config\.[cm]?[jt]s$/.test(name);
 export async function fingerprint(root) {
   const files=[];
@@ -117,7 +117,7 @@ export function judgeRun(run,policy) {
       !Number.isFinite(test.results[0]?.duration)||test.results[0].duration<0))reasons.push('Браузерные проверки не прошли с первой попытки без пропусков.');
   if(!digest(run.artifact?.sha256)||!integer(run.artifact?.bytes)||run.artifact.bytes<1||
     run.artifact.bytes>(policy?.maximumBundleBytes||0))reasons.push('Сборка отсутствует или превышает бюджет размера.');
-  if(run.artifactChanged||!run.artifactEnd||run.artifactEnd.sha256!==run.artifact?.sha256||run.artifactEnd.bytes!==run.artifact?.bytes)reasons.push('Собранный файл изменился во время браузерной проверки.');
+  if(run.artifactChanged||!run.artifactEnd||run.artifactEnd.sha256!==run.artifact?.sha256||run.artifactEnd.bytes!==run.artifact?.bytes)reasons.push('Собранный файл изменился во время автотестов.');
   if(run.error)reasons.push(String(run.error));
   return {passed:reasons.length===0,reasons};
 }

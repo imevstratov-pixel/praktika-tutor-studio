@@ -42,6 +42,23 @@ test('acceptance requires exactly two full passing runs of identical inputs and 
   }
 });
 
+test('server checks require a production build first, so a previous dist cannot satisfy acceptance',()=> {
+  const steps=names=>names.map(name=>({name,exitCode:0,timedOut:false,signal:null}));
+  const current=good();
+  current.steps=steps(['typecheck','production-build','unit-and-server','browser']);
+  assert.equal(judgeRun(current,policy).passed,true);
+
+  const stale=good();
+  stale.steps=steps(['typecheck','unit-and-server','production-build','browser']);
+  assert.equal(judgeRun(stale,policy).passed,false);
+  assert.equal(judgeAcceptance([stale,good(2)],policy).accepted,false);
+
+  // The build is protected during server tests too, even if they restore its bytes.
+  const altered=structuredClone(current);
+  altered.artifactChanged=true;
+  assert.equal(judgeRun(altered,policy).passed,false);
+});
+
 test('later green results never erase failures, skips, cancellations or retries',()=> {
   for(const edit of [
     run=>run.steps[0].exitCode=1,run=>run.unit.skipped=1,run=>run.unit.todo=1,run=>run.unit.cancelled=1,
