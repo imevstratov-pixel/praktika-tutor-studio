@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "consecutivePasses": 2,
+  "minimumUnitTests": 20,
+  "minimumBrowserTests": 8,
+  "allowSkipped": false,
+  "allowRetries": false,
+  "maximumBundleBytes": 2000000,
+  "scope": "Техническая приёмка локального PoC; качество реальной модели и педагогическая ценность оцениваются отдельно."
+}

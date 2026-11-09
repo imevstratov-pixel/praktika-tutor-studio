@@ -1,0 +1,187 @@
+COMPONENT PROVENANCE
+Praktika Studio
+Verified 2026-11-09
+
+Fluid Functionalism
+  Repository: https://github.com/mickadesign/fluid-functionalism
+  Verified revision: 2bfb830023e46ea9bcf5d326e015d4511ab9ef38 (2026-11-08)
+  License: MIT, Copyright (c) 2026 Micka Touillaud
+  Docs: https://www.fluidfunctionalism.com/docs
+  Registry namespace: @fluid
+  Registry pattern: https://www.fluidfunctionalism.com/r/{name}.json
+  Installed UI flavor: Radix; shared-source files live in registry/default.
+  Source is installed through the shadcn registry protocol and adapted in src/.
+  This revision identifies the upstream examined on the verification date.
+  Registry URLs are mutable. Pinned GitHub links identify the examined source.
+
+Interaction Tokens [@fluid/tokens]
+  Registry: https://www.fluidfunctionalism.com/r/tokens.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/tokens.json
+
+Type Scale [@fluid/type-scale]
+  Registry: https://www.fluidfunctionalism.com/r/type-scale.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/type-scale.json
+
+Typography [@fluid/typography]
+  Registry: https://www.fluidfunctionalism.com/r/typography.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/typography.json
+
+Spring Animations [@fluid/springs]
+  Registry: https://www.fluidfunctionalism.com/r/springs.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/springs.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/lib/springs.ts
+
+Font Weight Tokens [@fluid/font-weight]
+  Registry: https://www.fluidfunctionalism.com/r/font-weight.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/font-weight.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/lib/font-weight.ts
+
+Omit [@fluid/omit]
+  Registry: https://www.fluidfunctionalism.com/r/omit.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/omit.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/lib/omit.ts
+
+Shape Context [@fluid/shape-context]
+  Registry: https://www.fluidfunctionalism.com/r/shape-context.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/shape-context.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/lib/shape-context.tsx
+
+Size Context [@fluid/size-context]
+  Registry: https://www.fluidfunctionalism.com/r/size-context.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/size-context.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/lib/size-context.tsx
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/lib/type-scale.ts
+
+Icon Context [@fluid/icon-context]
+  Registry: https://www.fluidfunctionalism.com/r/icon-context.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/icon-context.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/lib/icon-context.tsx
+
+Fluid Provider [@fluid/fluid-provider]
+  Registry: https://www.fluidfunctionalism.com/r/fluid-provider.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/fluid-provider.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/lib/fluid-provider.tsx
+
+useFluidHover + FluidHoverHighlight [@fluid/use-fluid-hover]
+  Registry: https://www.fluidfunctionalism.com/r/use-fluid-hover.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/use-fluid-hover.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/hooks/use-fluid-hover.ts
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/fluid-hover-highlight.tsx
+
+Accordion [@fluid/accordion]
+  Registry: https://www.fluidfunctionalism.com/r/accordion.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/accordion.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/radix/accordion.tsx
+
+Banner [@fluid/banner]
+  Registry: https://www.fluidfunctionalism.com/r/banner.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/banner.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/banner.tsx
+
+Button [@fluid/button]
+  Registry: https://www.fluidfunctionalism.com/r/button.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/button.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/radix/button.tsx
+
+Checkbox [@fluid/checkbox]
+  Registry: https://www.fluidfunctionalism.com/r/checkbox.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/checkbox.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/radix/checkbox.tsx
+
+Field [@fluid/field]
+  Registry: https://www.fluidfunctionalism.com/r/field.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/field.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/field.tsx
+
+Input [@fluid/input]
+  Registry: https://www.fluidfunctionalism.com/r/input.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/input.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/input.tsx
+
+Textarea [@fluid/textarea]
+  Registry: https://www.fluidfunctionalism.com/r/textarea.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/textarea.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/default/textarea.tsx
+
+Tabs [@fluid/tabs]
+  Registry: https://www.fluidfunctionalism.com/r/tabs.json
+  Pinned registry: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/public/r/tabs.json
+  Source: https://github.com/mickadesign/fluid-functionalism/blob/2bfb830023e46ea9bcf5d326e015d4511ab9ef38/registry/radix/tabs.tsx
+
+shadcn/ui
+  Repository: https://github.com/shadcn-ui/ui
+  Verified revision: 8ab27715521cbd4f87ae6886cd989cbb678f6de7 (2026-11-08)
+  License: MIT, Copyright (c) 2023 shadcn
+  Installed via: npx shadcn add progress separator -y
+  components.json style: new-york
+  Tailwind v4 resolved source family: new-york-v4
+
+Progress
+  Registry: https://ui.shadcn.com/r/styles/new-york-v4/progress.json
+  Source: https://github.com/shadcn-ui/ui/blob/8ab27715521cbd4f87ae6886cd989cbb678f6de7/apps/v4/registry/new-york-v4/ui/progress.tsx
+  Local: src/components/ui/progress.tsx
+
+Separator
+  Registry: https://ui.shadcn.com/r/styles/new-york-v4/separator.json
+  Source: https://github.com/shadcn-ui/ui/blob/8ab27715521cbd4f87ae6886cd989cbb678f6de7/apps/v4/registry/new-york-v4/ui/separator.tsx
+  Local: src/components/ui/separator.tsx
+
+Inter Variable
+  Installed package: @fontsource-variable/inter
+  License: SIL Open Font License 1.1
+  License copied from node_modules/@fontsource-variable/inter/LICENSE.
+
+
+Installed package snapshot (2026-11-09)
+
+dependencies
+  @fontsource-variable/inter  declared 5.3.0  installed 5.3.0
+  @radix-ui/react-accordion  declared ^1.3.1  installed 1.3.1
+  @radix-ui/react-checkbox  declared ^1.4.1  installed 1.4.1
+  @radix-ui/react-slot  declared ^1.5.0  installed 1.5.0
+  @radix-ui/react-tabs  declared ^1.2.1  installed 1.2.1
+  class-variance-authority  declared 0.7.1  installed 0.7.1
+  clsx  declared 2.1.1  installed 2.1.1
+  cn  declared ^0.5.2  installed 0.5.2
+  lucide-react  declared 1.70.0  installed 1.70.0
+  motion  declared 14.10.1  installed 14.10.1
+  radix-ui  declared ^1.8.1  installed 1.8.1
+  react  declared 19.3.1  installed 19.3.1
+  react-dom  declared 19.3.1  installed 19.3.1
+  tailwind-merge  declared 3.7.0  installed 3.7.0
+
+devDependencies
+  @tailwindcss/vite  declared 4.3.5  installed 4.3.5
+  @types/react  declared 19.3.0  installed 19.3.0
+  @types/react-dom  declared 19.3.0  installed 19.3.0
+  @vitejs/plugin-react  declared 6.3.0  installed 6.3.0
+  shadcn  declared 4.23.0  installed 4.23.0
+  tailwindcss  declared 4.3.5  installed 4.3.5
+  typescript  declared 7.0.2  installed 7.0.2
+  vite  declared 8.3.6  installed 8.3.6
+  vite-plugin-singlefile  declared 2.3.4  installed 2.3.4
+
+Vendored local files
+  src/components/fluid-hover-highlight.tsx
+  src/components/ui/accordion.tsx
+  src/components/ui/banner.tsx
+  src/components/ui/button.tsx
+  src/components/ui/checkbox.tsx
+  src/components/ui/field.tsx
+  src/components/ui/input.tsx
+  src/components/ui/progress.tsx
+  src/components/ui/separator.tsx
+  src/components/ui/tabs.tsx
+  src/components/ui/textarea.tsx
+  src/hooks/use-fluid-hover.ts
+  src/lib/fluid-provider.tsx
+  src/lib/font-weight.ts
+  src/lib/icon-context.tsx
+  src/lib/omit.ts
+  src/lib/shape-context.tsx
+  src/lib/size-context.tsx
+  src/lib/springs.ts
+  src/lib/type-scale.ts
+  src/lib/utils.ts
+
+Local adaptation after import: progress.tsx now forwards value/max to the Radix root, respects max in the indicator calculation, and uses transition-transform instead of transition-all. App styling uses shared theme/type tokens; primary action height is raised to 46px.

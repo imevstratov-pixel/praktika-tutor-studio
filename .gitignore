@@ -1,0 +1,12 @@
+ui/node_modules/
+ui/reports/
+ui/test-results/
+ui/playwright-report/
+dist-v2/
+dist/
+.openai/
+shadcn-*-registry.json
+.env
+.env.*
+!.env.example
+.DS_Store

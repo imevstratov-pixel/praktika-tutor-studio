@@ -1,0 +1,107 @@
+name: Technical acceptance and Pages
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  # A newer PR run can replace its predecessor. Do not interrupt a live Pages deployment.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  acceptance:
+    name: Two complete acceptance runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium and its system dependencies
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Require two green runs of the same version and build
+        run: npm run accept
+      - name: Archive acceptance reports, including failures
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: quality-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ui/reports/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Verify and stage the accepted Pages file without rebuilding
+        id: accepted
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          import {appendFile, copyFile, mkdtemp, readFile, writeFile} from 'node:fs/promises';
+          import path from 'node:path';
+          import {fingerprint, judgeAcceptance} from './scripts/qa-contract.mjs';
+
+          const latest = JSON.parse(await readFile('reports/latest.json', 'utf8'));
+          const report = JSON.parse(await readFile(path.join(latest.directory, 'report.json'), 'utf8'));
+          assert.equal(latest.accepted, true, 'The latest run was not accepted');
+          assert.equal(report.mode, 'accept');
+          assert.equal(report.accepted, true);
+          assert.equal(report.runs.length, 2, 'Pages requires two complete runs');
+          assert.equal(judgeAcceptance(report.runs, report.policy).accepted, true);
+          assert.equal((await fingerprint(process.cwd())).hash, report.sourceHash, 'Source changed after acceptance');
+
+          const html = await readFile('../dist/index.html');
+          const sha256 = createHash('sha256').update(html).digest('hex');
+          for (const run of report.runs) {
+            assert.equal(sha256, run.artifact.sha256, 'Pages must use the accepted build');
+            assert.equal(html.length, run.artifact.bytes);
+          }
+          // Publish the accepted HTML with its notices, excluding old files in dist/.
+          const destination = await mkdtemp(path.join(process.env.RUNNER_TEMP, 'accepted-pages-'));
+          await writeFile(path.join(destination, 'index.html'), html);
+          await copyFile('THIRD_PARTY_NOTICES.txt', path.join(destination, 'THIRD_PARTY_NOTICES.txt'));
+          await appendFile(process.env.GITHUB_OUTPUT, `path=${destination}\n`);
+          console.log(`Verified accepted Pages artifact: ${sha256}`);
+          NODE
+      - name: Upload the accepted Pages artifact
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.accepted.outputs.path }}
+          retention-days: 7
+  deploy:
+    name: Publish the accepted build
+    needs: acceptance
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Read the repository Pages configuration
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Deploy the accepted artifact
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
