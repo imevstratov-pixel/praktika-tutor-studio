@@ -499,3 +499,105 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
+
+/* Preparation is an indeterminate task, not an estimated percentage. */
+.preparation-shell {
+  max-width: 780px;
+}
+.preparation-panel {
+  display: grid;
+  gap: 24px;
+}
+.preparation-steps {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.preparation-step {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+.preparation-step[aria-current="step"] {
+  background: var(--selected);
+  border-color: var(--border);
+}
+.preparation-step-icon {
+  color: var(--primary);
+  margin-top: 2px;
+}
+.preparation-step-next .preparation-step-icon {
+  color: var(--muted-foreground);
+}
+.preparation-step-state {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted-foreground);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+.preparation-step h2 {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.preparation-step p {
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+.preparation-wait {
+  display: grid;
+  gap: 10px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.preparation-elapsed {
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: var(--fw-semibold);
+}
+.preparation-wait-message {
+  color: var(--muted-foreground);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+.preparation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+}
+.preparation-actions p {
+  flex: 1 1 240px;
+  color: var(--muted-foreground);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+.preparation-cancelled {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 22px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--selected);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+@media (max-width: 620px) {
+  .preparation-step {
+    gap: 12px;
+    padding: 12px 8px;
+  }
+  .preparation-panel {
+    gap: 18px;
+  }
+  .preparation-actions > button {
+    width: 100%;
+  }
+}

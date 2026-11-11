@@ -7,6 +7,7 @@ import {Field, FieldLabel, FieldDescription, FieldError, FieldGroup} from "@/com
 import {Checkbox} from "@/components/ui/checkbox";
 import {Accordion, AccordionItem, AccordionTrigger, AccordionContent} from "@/components/ui/accordion";
 import ResultMaterials from "./ResultMaterials";
+import PreparationProgress from "./PreparationProgress";
 import {Banner, BannerTitle, BannerDescription} from "@/components/ui/banner";
 import {Progress} from "@/components/ui/progress";
 import {Separator} from "@/components/ui/separator";
@@ -16,6 +17,7 @@ import {validateDraft,createPackage,preview,parseSaved,serializeSaved,MAX_TEXT} 
 import {apiMode,readApiStatus} from "@/lib/api-client.mjs";
 
 const STORAGE="praktika.lesson.v2";
+const TIMEOUT_MESSAGE="ИИ не успел подготовить ответ. Текст лекции сохранён. Попробуйте ещё раз позже или сократите фрагмент.";
 const EMPTY={version:2,title:"",text:"",required:"",exampleId:null,draft:null,excluded:[],stage:0,sources:[],method:""};
 const steps=[["Добавьте лекцию","Текст, с которым будет работать тьютор"],["Проверьте содержание","Темы занятия и значения терминов"],["Получите материалы","Пример вопроса и файлы для запуска"]];
 const normalizeName=s=>s.trim().replace(/\s+/g," ").toLocaleLowerCase("ru");
@@ -48,13 +50,14 @@ function Topic({topic,draft,included,change,toggle}){const [edit,setEdit]=useSta
 export default function App(){
  const [mode]=useState(()=>apiMode(location,document));
  const [state,setState]=useState(initial),[busy,setBusy]=useState(false),[error,setError]=useState(""),[saved,setSaved]=useState(true),[library,setLibrary]=useState(false),[pending,setPending]=useState(null),[api,setApi]=useState(()=>({ai:false,provider:"",phase:mode==="offline"?"offline":"checking"})),[statusAttempt,setStatusAttempt]=useState(0);
+ const [preparation,setPreparation]=useState(null),[cancelledNotice,setCancelledNotice]=useState(false);
  const heading=useRef(null),file=useRef(null),abort=useRef(null);
  const {stage,draft}=state;
  const issues=draft?validateDraft(draft,state.excluded,requiredNames(state.required)):[];
  const selectedTopics=draft?.topics.filter(t=>!state.excluded.includes(t.id))||[];
  const selectedTerms=draft?.terms.filter(t=>!state.excluded.includes(t.id))||[];
  useEffect(()=>{try{const value=serializeSaved(state);if(value)localStorage.setItem(STORAGE,value);setSaved(Boolean(value))}catch{setSaved(false)}},[state]);
- useEffect(()=>{heading.current?.focus();window.scrollTo({top:0,behavior:"instant"})},[stage]);
+ useEffect(()=>{heading.current?.focus();window.scrollTo({top:0,behavior:"instant"})},[stage,busy]);
  useEffect(()=>{
   if(mode==="offline")return;
   const controller=new AbortController();
@@ -64,7 +67,7 @@ export default function App(){
   }).catch(()=>{if(!controller.signal.aborted)setApi({ai:false,provider:"",phase:mode==="hosted"?"unavailable":"offline"})});
   return()=>controller.abort();
  },[mode,statusAttempt]);
- useEffect(()=>()=>abort.current?.abort(),[]);
+ useEffect(()=>()=>{const controller=abort.current;abort.current=null;controller?.abort()},[]);
  const patch=(v)=>setState(s=>({...s,...v}));
  function sourcePatch(v){setState(s=>({...s,...v,draft:null,excluded:[],stage:0,...("text" in v?{sources:[],exampleId:null}:{})}));setError("")}
  function go(n){patch({stage:n});setError("")}
@@ -77,26 +80,63 @@ export default function App(){
   patch({excluded:[...excluded]});setError("")
  }
  function updateItem(group,id,values){patch({draft:{...draft,[group]:draft[group].map(t=>t.id===id?{...t,...values}:t)}})}
- function loadExample(ex){setState({...EMPTY,title:ex.title,text:ex.text,exampleId:ex.id,sources:ex.sources});setError("");setLibrary(false);setPending(null)}
+ function loadExample(ex){setState({...EMPTY,title:ex.title,text:ex.text,exampleId:ex.id,sources:ex.sources});setError("");setCancelledNotice(false);setLibrary(false);setPending(null)}
  function useExample(ex){if(state.text&&state.exampleId!==ex.id){setPending({type:"example",example:ex});return}loadExample(ex)}
- function clearLesson(){setState({...EMPTY});setError("");setLibrary(false);setPending(null)}
+ function clearLesson(){setState({...EMPTY});setError("");setCancelledNotice(false);setLibrary(false);setPending(null)}
  function reset(){if(state.text||draft){setPending({type:"reset"});window.scrollTo({top:0,behavior:"instant"});return}clearLesson()}
  async function upload(e){try{const f=e.target.files[0];if(!f)return;if(!/\.(txt|md)$/i.test(f.name)||f.size>130000)throw Error("Выберите файл TXT или MD размером до 130 КБ.");const text=new TextDecoder("utf-8",{fatal:true}).decode(await f.arrayBuffer());if(text.length>MAX_TEXT||text.includes("\0"))throw Error("В файле должно быть до 32 000 знаков текста в UTF-8.");sourcePatch({text,title:f.name.replace(/\.[^.]+$/,"").slice(0,160)})}catch(err){setError(err.message||"Не удалось прочитать файл. Попробуйте вставить текст.")}finally{e.target.value=""}}
  async function prepare(){
-  if(prepareBlocked)return;
+  if(abort.current||busy||prepareBlocked)return;
   if(state.text.trim().length<45||state.text.length>MAX_TEXT){setError("Добавьте от 45 до 32 000 знаков текста лекции.");document.getElementById("lecture").focus();return}
   if(draft){go(1);return}
-  setBusy(true);setError("");abort.current=new AbortController();
+  const controller=new AbortController();
+  abort.current=controller;
+  const current=()=>abort.current===controller&&!controller.signal.aborted;
+  const timeout=api.ai?setTimeout(()=>{
+   if(abort.current!==controller)return;
+   abort.current=null;
+   controller.abort(new DOMException("Preparation timed out","TimeoutError"));
+   setBusy(false);setPreparation(null);setError(TIMEOUT_MESSAGE);
+   if(mode==="hosted")refreshStatus();
+  },200000):null;
+  controller.signal.addEventListener("abort",()=>clearTimeout(timeout),{once:true});
+  setPreparation({startedAt:Date.now(),isAi:api.ai,phase:"waiting"});
+  setBusy(true);setError("");setCancelledNotice(false);setPending(null);
   let requestedAi=false;
   try{let d;const title=state.title.trim()||"Новое занятие";let usedMethod="Локальные правила";
-   if(api.ai){requestedAi=true;const r=await fetch("/api/structure",{method:"POST",credentials:"same-origin",redirect:"error",headers:{"Content-Type":"application/json"},signal:AbortSignal.any([abort.current.signal,AbortSignal.timeout(200000)]),body:JSON.stringify({title,text:state.text})});const body=await r.json();if(!r.ok)throw Error(body.error||"Не удалось подготовить содержание.");d=body;usedMethod=api.provider}
-   else if(mode!=="hosted"){await new Promise(r=>setTimeout(r,0));d=engine.build(state.text,title)}
+   if(api.ai){
+    requestedAi=true;
+    const r=await fetch("/api/structure",{method:"POST",credentials:"same-origin",redirect:"error",headers:{"Content-Type":"application/json"},signal:controller.signal,body:JSON.stringify({title,text:state.text})});
+    if(!current())return;
+    setPreparation(p=>p?{...p,phase:"receiving"}:p);
+    const body=await r.json();
+    if(!current())return;
+    if(!r.ok)throw Error(body.error||"Не удалось подготовить содержание.");
+    d=body;usedMethod=api.provider;
+   }
+   else if(mode!=="hosted"){d=engine.build(state.text,title)}
    else throw Error("Сервис подготовки сейчас недоступен. Проверьте соединение и попробуйте ещё раз.");
    if(!d.topics.length)throw Error("Добавьте связный фрагмент лекции с пояснениями.");
    const excluded=d.terms.filter(t=>!t.definition).map(t=>t.id);
    for(const name of requiredNames(state.required)){let term=d.terms.find(t=>normalizeName(t.name)===normalizeName(name));if(!term){const evidence=d.excerpts.filter(e=>e.text.toLocaleLowerCase("ru").includes(name.toLocaleLowerCase("ru"))).map(e=>e.id);term={id:"term-"+crypto.randomUUID(),name,definition:"",evidenceIds:evidence,topicIds:d.topics.filter(t=>t.evidenceIds.some(id=>evidence.includes(id))).map(t=>t.id)};d.terms.push(term)}const i=excluded.indexOf(term.id);if(i>=0)excluded.splice(i,1)}
-   patch({title,draft:d,excluded,stage:1,method:usedMethod});
-  }catch(err){if(err.name!=="AbortError")setError(err.message||"Попробуйте ещё раз или сократите текст.")}finally{setBusy(false);if(mode==="hosted"&&requestedAi){setApi(s=>({...s,phase:"checking"}));setStatusAttempt(n=>n+1)}}
+   if(current())patch({title,draft:d,excluded,stage:1,method:usedMethod});
+  }catch(err){
+   if(abort.current!==controller)return;
+   if(controller.signal.reason?.name==="TimeoutError"||err.name==="TimeoutError")setError(TIMEOUT_MESSAGE);
+   else if(!controller.signal.aborted&&err.name!=="AbortError")setError(err.message||"Попробуйте ещё раз или сократите текст.");
+  }finally{
+   clearTimeout(timeout);
+   if(abort.current===controller){abort.current=null;setBusy(false);setPreparation(null);if(mode==="hosted"&&requestedAi)refreshStatus()}
+  }
+ }
+ function refreshStatus(){setApi(s=>({...s,phase:"checking"}));setStatusAttempt(n=>n+1)}
+ function cancelPreparation(){
+  const controller=abort.current;
+  if(!controller)return;
+  abort.current=null;
+  controller.abort();
+  setBusy(false);setPreparation(null);setError("");setCancelledNotice(true);
+  if(mode==="hosted"&&preparation?.isAi)refreshStatus();
  }
  function finish(){if(issues.length){setError(issues[0].message);const row=document.getElementById("item-"+issues[0].id);row?.scrollIntoView({block:"center"});(row?.querySelector('[aria-invalid="true"],textarea:not([readonly]),input:not([readonly]):not([disabled]),select')||row?.querySelector("button:not([disabled])"))?.focus({preventScroll:true});return}go(2)}
  function bundle(){return createPackage(draft,state.excluded,state.sources,state.method||"Не указан",requiredNames(state.required))}
@@ -118,10 +158,12 @@ export default function App(){
    <header className="topbar"><span>{state.title||"Новое занятие"}</span><span className="step-counter">Шаг {stage+1} из 3</span></header>
    <Progress value={stage+1} max={3} className="page-progress" aria-label="Этап подготовки" aria-valuetext={"Шаг "+(stage+1)+" из 3"}/>
    <main id="main" className="main">
+    {busy&&preparation?<PreparationProgress headingRef={heading} {...preparation} hosted={mode==="hosted"} onCancel={cancelPreparation}/>:<>
     <div className="page-heading"><h1 ref={heading} tabIndex={-1}>{["Подготовьте занятие по вашей лекции","Проверьте, чему будет учить тьютор","Материалы занятия готовы"][stage]}</h1><p>{["Вставьте текст лекции. Мы соберём темы и словарь, чтобы тьютор помог слушателям закрепить материал.","Оставьте нужные темы и уточните определения. Эти формулировки станут основой ответов тьютора.","Посмотрите содержание и первый вопрос. Затем скачайте файлы для подключения тьютора."][stage]}</p></div>
     {stage>0&&mode==="hosted"&&quotaNote&&api.phase==="ready"&&<p className="processing-note" role="status">{quotaNote}</p>}
     {pending&&<div className="notice-wrap"><Notice status="warning" title={pending.type==="reset"?"Начать новое занятие?":"Заменить текст готовым примером?"}>Текущий черновик и ваши правки будут удалены.</Notice><div className="confirmation-actions"><Button variant="secondary" onClick={()=>setPending(null)}>Оставить текущий черновик</Button><Button onClick={()=>pending.type==="reset"?clearLesson():loadExample(pending.example)}>{pending.type==="reset"?"Начать новое":"Заменить текст"}</Button></div></div>}
     {error&&<div className="notice-wrap"><Notice status="error" title="Нужно уточнение">{error}</Notice></div>}
+    {cancelledNotice&&<div className="preparation-cancelled" role="note" aria-live="polite"><p>Разбор отменён. Текст лекции сохранён.</p>{mode==="hosted"&&<p>Если ИИ уже начал обработку, запуск может остаться использованным.</p>}</div>}
     {stage===0&&<div className="input-layout">
      <section className="sheet">
       <FieldGroup>
@@ -129,7 +171,7 @@ export default function App(){
        <Field data-invalid={Boolean(error)}><div className="label-row"><FieldLabel htmlFor="lecture">Текст лекции</FieldLabel><Button variant="ghost" leadingIcon={Upload} onClick={()=>file.current.click()} disabled={busy}>Загрузить файл</Button><input ref={file} type="file" aria-label="Файл лекции" accept=".txt,.md" hidden onChange={upload}/></div><Textarea id="lecture" name="lecture" autoComplete="off" className="lecture-input" value={state.text} onChange={e=>sourcePatch({text:e.target.value})} placeholder="Вставьте сюда расшифровку лекции или фрагмент учебного материала…" disabled={busy} aria-invalid={Boolean(error)}/><div className="input-meta"><FieldDescription>Текст, TXT или MD. До 32 000 знаков.</FieldDescription><span>{state.text.length.toLocaleString("ru")} знаков</span></div></Field>
       </FieldGroup>
       {state.exampleId&&<div className="sample-note"><FileText size={15}/><span>Учебный пример ШМК. Ситуация и числа вымышлены.</span></div>}
-      <div className="form-end"><p className="processing-note" id="processing-note" role="status">{note}</p>{apiUnavailable&&<Button variant="secondary" onClick={()=>setStatusAttempt(n=>n+1)}>Проверить ещё раз</Button>}<Button className="main-action" loading={busy} disabled={prepareBlocked} aria-describedby="processing-note" trailingIcon={ArrowRight} onClick={prepare}>{busy?"Готовим содержание…":"Подготовить содержание"}</Button>{busy&&<Button variant="ghost" onClick={()=>abort.current.abort()}>Отменить</Button>}</div>
+      <div className="form-end"><p className="processing-note" id="processing-note" role="status">{note}</p>{apiUnavailable&&<Button variant="secondary" onClick={()=>setStatusAttempt(n=>n+1)}>Проверить ещё раз</Button>}<Button className="main-action" disabled={prepareBlocked} aria-describedby="processing-note" trailingIcon={ArrowRight} onClick={prepare}>Подготовить содержание</Button></div>
       <div className="sample-action"><Button variant="secondary" leadingIcon={BookOpen} onClick={()=>setLibrary(!library)} disabled={busy} aria-expanded={library}>Попробовать на готовом примере</Button>{library&&<div className="example-list">{examples.map(ex=><Button key={ex.id} variant="ghost" onClick={()=>useExample(ex)}>{ex.title}</Button>)}</div>}</div>
       <Accordion type="single" collapsible className="w-full"><AccordionItem value="required"><AccordionTrigger>Есть термины, которые важно сохранить?</AccordionTrigger><AccordionContent><Field><FieldLabel htmlFor="required">Обязательные термины</FieldLabel><Input id="required" name="required" autoComplete="off" value={state.required} onChange={e=>sourcePatch({required:e.target.value})} placeholder="Например, цель проекта, заинтересованная сторона…" maxLength={600} disabled={busy}/><FieldDescription>Укажите через запятую. Мы попросим проверить определение каждого.</FieldDescription></Field></AccordionContent></AccordionItem></Accordion>
 
@@ -148,6 +190,7 @@ export default function App(){
      <aside className="review-summary"><h2>Ваше занятие</h2><p>{state.title}</p><dl><div><dt>Темы</dt><dd>{selectedTopics.length}</dd></div><div><dt>Термины</dt><dd>{selectedTerms.length}</dd></div></dl><p className="caption">После проверки вы увидите пример первого вопроса и сможете скачать материалы.</p><Button className="main-action" trailingIcon={ArrowRight} onClick={finish}>Посмотреть результат</Button><Button variant="ghost" leadingIcon={ArrowLeft} onClick={()=>go(0)}>Вернуться к лекции</Button></aside>
     </div>}
     {stage===2&&draft&&<Result state={state} selectedTopics={selectedTopics} selectedTerms={selectedTerms} getPackage={bundle} exportPackage={exportPackage} exportDescription={exportDescription} back={()=>go(1)}/>}
+    </>}
    </main><footer className="footer">Практика <span>Рабочая версия для методиста</span></footer>
   </div>
  </div>
