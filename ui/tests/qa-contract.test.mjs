@@ -144,23 +144,30 @@ test('browser reports retain retries and require complete, consistent result sta
   assert.equal(summarizeBrowser({}).reportValid,false);
 });
 
-test('fingerprint covers nested tests, local server and CI but ignores generated reports',async t=> {
+test('fingerprint covers nested tests, local and hosted servers and CI but ignores generated reports',async t=> {
   const folder=await mkdtemp(path.join(tmpdir(),'praktika-qa-gate-'));
   t.after(()=>rm(folder,{recursive:true,force:true}));
   const root=path.join(folder,'ui');
-  for(const dir of ['ui/src','ui/tests/deep','ui/scripts','ui/reports','local','.github/workflows']) {
+  for(const dir of ['ui/src','ui/tests/deep','ui/scripts','ui/reports','local','hosted/migrations','.github/workflows']) {
     await mkdir(path.join(folder,dir),{recursive:true});
   }
   await writeFile(path.join(root,'package.json'),'{}');
   await writeFile(path.join(root,'tests/deep/sample.test.mjs'),'test');
   await writeFile(path.join(folder,'local/server.mjs'),'server');
+  await writeFile(path.join(folder,'hosted/worker.mjs'),'worker');
+  await writeFile(path.join(folder,'hosted/migrations/0000_demo.sql'),'schema');
   await writeFile(path.join(folder,'.github/workflows/quality.yml'),'version1');
   const first=await fingerprint(root);
   assert(first.manifest.some(file=>file.file==='tests/deep/sample.test.mjs'));
   assert(first.manifest.some(file=>file.file==='../local/server.mjs'));
+  assert(first.manifest.some(file=>file.file==='../hosted/worker.mjs'));
+  assert(first.manifest.some(file=>file.file==='../hosted/migrations/0000_demo.sql'));
   assert(first.manifest.some(file=>file.file==='../.github/workflows/quality.yml'));
   await writeFile(path.join(root,'reports/result.json'),'generated');
   assert.equal((await fingerprint(root)).hash,first.hash);
+  await writeFile(path.join(folder,'hosted/worker.mjs'),'changed-worker');
+  assert.notEqual((await fingerprint(root)).hash,first.hash);
+  await writeFile(path.join(folder,'hosted/worker.mjs'),'worker');
   await writeFile(path.join(folder,'.github/workflows/quality.yml'),'version2');
   assert.notEqual((await fingerprint(root)).hash,first.hash);
 });

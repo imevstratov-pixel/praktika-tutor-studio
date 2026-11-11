@@ -13,6 +13,7 @@ async function discover(folder) {
 const files=(await discover('tests')).sort();
 if(!files.length)throw Error('No unit tests discovered');
 files.push('../local/server.test.mjs');
+files.push('../hosted/worker.test.mjs');
 const tap=process.argv.includes('--tap');
 const child=spawnSync(process.execPath,['--test','--test-concurrency=1','--test-reporter='+ (tap?'tap':'spec'),...files],{cwd:root,stdio:'inherit'});
 process.exitCode=child.status??1;

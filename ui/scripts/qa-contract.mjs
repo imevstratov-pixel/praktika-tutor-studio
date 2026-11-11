@@ -24,6 +24,7 @@ export async function fingerprint(root) {
   }
   for(const folder of ['src','tests','scripts'])await scan(folder);
   await scan('../.github',true);
+  await scan('../hosted',true);
   for(const entry of await readdir(root,{withFileTypes:true})) {
     if(!inputFile(entry.name))continue;
     if(entry.isSymbolicLink())throw Error('Symlink in acceptance inputs: '+entry.name);

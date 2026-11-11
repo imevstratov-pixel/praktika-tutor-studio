@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer, request as httpRequest} from 'node:http';
 import {once} from 'node:events';
 import {makeServer, excerptsFrom, validateGraph} from './server.mjs';
+import {readBounded, Problem} from './analysis.mjs';
 import {graphJsonSchema} from './schema.mjs';
 import {createPackage} from '../ui/src/lib/course.js';
 
@@ -110,6 +111,38 @@ test('source splitting preserves content and complete Unicode characters',()=> {
   assert(parts.every(p=>p.text.isWellFormed()),'splitting must not cut a surrogate pair');
 });
 
+test('portable bounded reader preserves UTF-8 across byte boundaries in Web and iterable streams',async()=> {
+  const original='\ufeff{"text":"Цель — изменение 🙂, а не действие."}';
+  const bytes=new TextEncoder().encode(original);
+  // Views have non-zero offsets; every Cyrillic letter and emoji crosses chunks.
+  const padded=new Uint8Array(bytes.length+4);padded.set(bytes,2);
+  const chunks=Array.from(bytes,(_,i)=>padded.subarray(i+2,i+3));
+  async function* iterable() { yield* chunks; }
+  const web=new ReadableStream({start(controller) {
+    for(const chunk of chunks) controller.enqueue(chunk);
+    controller.close();
+  }});
+  assert.equal(await readBounded(iterable(),bytes.length,502),original);
+  assert.equal(await readBounded(web,bytes.length,502),original);
+  assert.equal(web.locked,false);
+});
+
+test('portable bounded reader counts bytes, cancels oversized Web bodies and preserves error status',async()=> {
+  const chunks=['я','🙂'].map(value=>new TextEncoder().encode(value));
+  let cancelled=0;
+  const web=new ReadableStream({start(controller) {
+    chunks.forEach(chunk=>controller.enqueue(chunk));
+  },cancel(){cancelled++;}});
+  await assert.rejects(readBounded(web,5,413),error=>error instanceof Problem && error.status===413);
+  assert.equal(cancelled,1);
+  assert.equal(web.locked,false);
+  async function* iterable() { yield* chunks; }
+  assert.equal(await readBounded(iterable(),6,502),'я🙂');
+  await assert.rejects(readBounded(iterable(),5,502),error=>error instanceof Problem && error.status===502);
+  const empty=new ReadableStream({start(controller){controller.close();}});
+  assert.equal(await readBounded(empty,0,413),'');
+});
+
 test('provider off keeps static page available and returns a recoverable API error',limit,async t=> {
   const site=await service(t);
   assert.deepEqual(await(await fetchBounded(site+'/api/status')).json(),{ai:false,provider:'Модель не подключена'});
@@ -126,6 +159,32 @@ test('unavailable provider returns bounded errors and remains retryable',limit,a
   const ollama=await service(t,provider,{TUTOR_PROVIDER:'ollama',TUTOR_MODEL:''});
   assert.equal((await(await fetchBounded(ollama+'/api/status')).json()).ai,false);
   await errorStatus(await post(ollama),503);
+});
+
+test('provider redirects are rejected without contacting the target or forwarding credentials',limit,async t=> {
+  let targetRequests=0;
+  const target=await listen(createServer((req,res)=>{
+    targetRequests++;
+    res.end(envelope());
+  }),t);
+  let redirect=true;
+  const authorizations=[];
+  const provider=await listen(createServer((req,res)=>{
+    authorizations.push(req.headers.authorization);
+    if(redirect){res.writeHead(302,{Location:target+'/collect'});res.end();}
+    else res.end(envelope());
+  }),t);
+  const site=await service(t,provider,{TUTOR_API_KEY:'test-placeholder-key'});
+  const response=await post(site);
+  assert.equal(response.status,502);
+  const result=await response.json();
+  assert.match(result.error,/HTTP 302/);
+  assert(!JSON.stringify(result).includes('test-placeholder-key'));
+  assert.equal(targetRequests,0);
+  redirect=false;
+  assert.equal((await post(site)).status,200,'A rejected redirect must not leave the service busy');
+  assert.deepEqual(authorizations,['Bearer test-placeholder-key','Bearer test-placeholder-key']);
+  assert.equal(targetRequests,0);
 });
 
 test('valid API preserves citations, topic membership, user title and server-only credentials',limit,async t=> {
