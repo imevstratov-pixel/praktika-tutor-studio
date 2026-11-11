@@ -3,6 +3,7 @@ import { readFile, realpath } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
+import { graphJsonSchema } from './schema.mjs';
 
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
 const LOCAL = '127.0.0.1';
@@ -17,6 +18,9 @@ const loopback = name => ['localhost', LOCAL, '[::1]'].includes(name);
 function config(env) {
   const provider = env.TUTOR_PROVIDER || 'ollama';
   if (!['off', 'ollama', 'compatible'].includes(provider)) throw new Error('Задайте TUTOR_PROVIDER: ollama, compatible или off.');
+  const jsonMode = env.TUTOR_JSON_MODE || 'object';
+  if (!['object', 'schema'].includes(jsonMode)) throw new Error('Задайте TUTOR_JSON_MODE: object или schema.');
+  if (jsonMode === 'schema' && provider !== 'compatible') throw new Error('TUTOR_JSON_MODE=schema доступен только для совместимого API.');
   const port = Number(env.TUTOR_PORT || 4187);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Некорректный TUTOR_PORT.');
   let base;
@@ -30,7 +34,7 @@ function config(env) {
   }
   const model = (env.TUTOR_MODEL || '').trim();
   if (provider === 'compatible' && !model) throw new Error('Укажите TUTOR_MODEL для совместимого API.');
-  return {provider, port, base, model, key: provider === 'compatible' ? env.TUTOR_API_KEY : ''};
+  return {provider, port, base, model, jsonMode, key: provider === 'compatible' ? env.TUTOR_API_KEY : ''};
 }
 
 export function excerptsFrom(text) {
@@ -100,10 +104,12 @@ export function validateGraph(raw, excerpts, title) {
     if (new Set(topicIds).size !== topicIds.length || topicIds.some(id => !topicSet.has(id))) throw bad();
     return {...identity, definition:o.definition === '' ? '' : boundedString(o.definition,1000), evidenceIds:cited(o), topicIds};
   });
+  const termSet = new Set(terms.map(o=>o.id));
   const seen = new Set();
   const links = boundedArray(raw.links, 32).map(o => {
     if (!o || !nodes.has(o.from) || !nodes.has(o.to) || o.from === o.to) throw bad();
-    const relation = boundedString(o.relation,160);
+    let relation = boundedString(o.relation,160);
+    if (topicSet.has(o.from) && termSet.has(o.to) && relation.toLocaleLowerCase('ru').replace(/\s+/gu,' ') === 'содержит термин') relation = 'содержит термин';
     const key = JSON.stringify([o.from,o.to,relation.toLocaleLowerCase('ru')]);
     if (seen.has(key)) throw bad();
     seen.add(key);
@@ -183,9 +189,12 @@ async function analyze(settings, input, signal) {
   const headers = {'Content-Type':'application/json'};
   if (settings.key) headers.Authorization = 'Bearer ' + settings.key;
   const messages = [{role:'system',content:GUIDE},{role:'user',content:JSON.stringify({title,excerpts})}];
+  const responseFormat = settings.jsonMode === 'schema'
+    ? {type:'json_schema', json_schema:{name:'lesson_graph', strict:true, schema:graphJsonSchema(excerpts)}}
+    : {type:'json_object'};
   const payload = await upstream(new URL('chat/completions',settings.base),{
     method:'POST',headers,
-    body:JSON.stringify({model,messages,stream:false, response_format:{type:'json_object'},max_tokens:5500})
+    body:JSON.stringify({model,messages,stream:false,response_format:responseFormat,max_tokens:5500})
   },DEADLINE,350000,signal);
   const answer = payload?.choices?.[0]?.message?.content;
   if (typeof answer !== 'string' || payload.choices[0].finish_reason === 'length') throw bad();
@@ -269,5 +278,5 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
       console.log('Студия открыта по адресу ' + page + '\nДля остановки нажмите Ctrl+C.');
       if (process.argv.includes('--open') && process.platform === 'darwin') spawn('/usr/bin/open',[page],{stdio:'ignore'}).on('error',()=>{});
     });
-  } catch { console.error('Проверьте TUTOR_PROVIDER, TUTOR_MODEL, TUTOR_API_BASE и TUTOR_PORT (см. local/README.md).'); process.exitCode = 1; }
+  } catch { console.error('Проверьте TUTOR_PROVIDER, TUTOR_MODEL, TUTOR_API_BASE, TUTOR_JSON_MODE и TUTOR_PORT (см. local/README.md).'); process.exitCode = 1; }
 }

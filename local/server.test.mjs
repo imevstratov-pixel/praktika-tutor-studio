@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {createServer, request as httpRequest} from 'node:http';
 import {once} from 'node:events';
 import {makeServer, excerptsFrom, validateGraph} from './server.mjs';
+import {graphJsonSchema} from './schema.mjs';
+import {createPackage} from '../ui/src/lib/course.js';
 
 const text = 'Цель проекта описывает ожидаемое изменение. Задача — конкретная работа, необходимая для достижения цели.';
 const evidence = [{id:'e1',quote:'Цель проекта описывает ожидаемое изменение.'}];
@@ -64,6 +66,9 @@ function chunked(site,body,headers={}) {
 test('configuration rejects unsupported, insecure, and incomplete settings',() => {
   for (const env of [
     {TUTOR_PROVIDER:'unknown'},
+    {TUTOR_PROVIDER:'off',TUTOR_JSON_MODE:'unknown'},
+    {TUTOR_PROVIDER:'ollama',TUTOR_JSON_MODE:'schema'},
+    {TUTOR_PROVIDER:'off',TUTOR_JSON_MODE:'schema'},
     {TUTOR_PROVIDER:'off',TUTOR_PORT:'0'},
     {TUTOR_PROVIDER:'off',TUTOR_PORT:'65536'},
     {TUTOR_PROVIDER:'compatible',TUTOR_API_BASE:'https://example.com/v1'},
@@ -78,8 +83,11 @@ test('graph validation rejects invented quotations, missing references, duplicat
     x=>x.terms[0].evidence[0].quote='такой фразы нет',
     x=>x.terms[0].evidence[0].id='e99',
     x=>x.terms[0].topicIds=['t8'],
+    x=>x.terms[0].topicIds=[],
+    x=>x.terms[0].definition='я'.repeat(1001),
     x=>x.links[0].to='k1',
     x=>x.links[0].to='k99',
+    x=>x.links[0].to='e1',
     x=>x.topics.push({...x.topics[0],id:'t2'}),
     x=>x.terms[0].id=['k1'],
     x=>x.links.push(structuredClone(x.links[0])),
@@ -142,8 +150,89 @@ test('valid API preserves citations, topic membership, user title and server-onl
   assert.equal(requests[0].url,'/v1/chat/completions');
   assert.equal(requests[0].headers.authorization,'Bearer test-placeholder-key');
   assert.equal(requests[0].body.model,'test-model');
+  assert.deepEqual(requests[0].body.response_format,{type:'json_object'});
   assert.deepEqual(JSON.parse(requests[0].body.messages[1].content).excerpts,[{id:'e1',text}]);
   assert(!JSON.stringify([status,result]).includes('test-placeholder-key'));
+});
+
+test('schema mode sends strict source-bound structure while preserving independent validation and recovery',limit,async t=> {
+  const requests=[];
+  let answer=graph;
+  const provider=await listen(createServer(async(req,res)=>{
+    const chunks=[];for await(const chunk of req)chunks.push(chunk);
+    requests.push(JSON.parse(Buffer.concat(chunks)));
+    res.end(envelope(answer));
+  }),t);
+  const site=await service(t,provider,{TUTOR_JSON_MODE:'schema'});
+  assert.equal((await post(site)).status,200);
+  const format=requests[0].response_format;
+  assert.equal(format.type,'json_schema');
+  assert.equal(format.json_schema.strict,true);
+  const schema=format.json_schema.schema;
+  function assertClosedObjects(part){
+    for(const constraint of ['minLength','maxLength','maxItems'])assert.equal(Object.hasOwn(part,constraint),false,'Provider schema avoids expensive length/count grammar constraints');
+    if(part.type==='object'){
+      assert.equal(part.additionalProperties,false);
+      assert.deepEqual(new Set(part.required),new Set(Object.keys(part.properties)));
+      Object.values(part.properties).forEach(assertClosedObjects);
+    }else if(part.type==='array')assertClosedObjects(part.items);
+  }
+  assertClosedObjects(schema);
+  for(const collection of ['topics','terms','links']){
+    assert.deepEqual(schema.properties[collection].items.properties.evidence.items.properties.id.enum,['e1']);
+  }
+  const terms=schema.properties.terms.items.properties;
+  assert.equal(terms.definition.type,'string');
+  assert.equal(terms.definition.minLength,undefined,'An explicitly mentioned but undefined term remains representable');
+  assert.equal(terms.topicIds.minItems,1);
+  assert.equal(terms.evidence.minItems,1);
+  assert(new RegExp(terms.topicIds.items.pattern).test('t2'));
+  assert(!new RegExp(terms.topicIds.items.pattern).test('e2'));
+  const links=schema.properties.links.items.properties;
+  assert(new RegExp(links.to.pattern).test('k10'));
+  assert(new RegExp(links.to.pattern).test('t1'));
+  assert(!new RegExp(links.to.pattern).test('e5'),'A source fragment cannot be a concept endpoint');
+  for(const mutate of [
+    value=>value.terms[0].topicIds=[],
+    value=>value.terms[0].topicIds=['t99'],
+    value=>value.links[0].to='e1',
+    value=>value.links[0].to='k99',
+  ]){
+    answer=structuredClone(graph);mutate(answer);
+    await errorStatus(await post(site),502);
+  }
+  answer={title:'Без содержания',topics:[],terms:[],links:[]};
+  await errorStatus(await post(site),422);
+  answer=graph;
+  const longer=(text+' ').repeat(8);
+  assert.equal((await post(site,{text:longer})).status,200);
+  const expectedIds=excerptsFrom(longer.trim()).map(item=>item.id);
+  assert(expectedIds.length>1);
+  assert.deepEqual(requests.at(-1).response_format.json_schema.schema.properties.terms.items.properties.evidence.items.properties.id.enum,expectedIds);
+  assert.deepEqual(format.json_schema.schema.properties.terms.items.properties.evidence.items.properties.id.enum,['e1'],'A later request does not mutate an earlier schema');
+  assert.equal(requests.length,7,'A failed structured response does not trigger hidden retries or a weaker request');
+});
+
+test('schema construction is pure and rejects missing source identifiers',()=> {
+  const excerpts=excerptsFrom(text),before=structuredClone(excerpts);
+  assert.deepEqual(graphJsonSchema(excerpts),graphJsonSchema(excerpts));
+  assert.deepEqual(excerpts,before);
+  for(const input of [null,[],[{id:'k1'}],[{}]])assert.throws(()=>graphJsonSchema(input),TypeError);
+});
+
+test('membership spelling is canonical across validation and export without altering concept relations',()=> {
+  const input=structuredClone(graph);
+  input.terms.push({id:'k2',name:'Задача',definition:'Конкретная работа, необходимая для достижения цели.',topicIds:['t1'],evidence:[{id:'e1',quote:'Задача — конкретная работа, необходимая для достижения цели.'}]});
+  input.links=[
+    {from:'t1',to:'k1',relation:'Содержит  термин',evidence},
+    {from:'k1',to:'k2',relation:'Содержит термин',evidence},
+  ];
+  const draft=validateGraph(input,excerptsFrom(text),'Проба');
+  assert.equal(draft.links.find(link=>link.from==='t1'&&link.to==='k1').relation,'содержит термин');
+  assert.equal(draft.links.find(link=>link.from==='k1'&&link.to==='k2').relation,'Содержит термин');
+  const pack=createPackage(draft);
+  assert.equal(pack.links.filter(link=>link.from==='t1'&&link.to==='k1').length,1);
+  assert(pack.links.some(link=>link.from==='k1'&&link.to==='k2'&&link.relation==='Содержит термин'));
 });
 
 test('malformed provider responses fail safely and each next valid request succeeds',limit,async t=> {
